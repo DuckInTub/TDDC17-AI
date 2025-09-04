@@ -1,0 +1,14 @@
+INDEX VERSION 1.126+/home/oloan/test/ai_lab1_2012/lab1_workspace/.metadata/.plugins/org.eclipse.jdt.core
+2846372234.index
+331468039.index
+2917382390.index
+3646957627.index
+161649969.index
+2050671369.index
+2260803963.index
+612229765.index
+3222683947.index
+1080065135.index
+4155219971.index
+3719052217.index
+3629936994.index
