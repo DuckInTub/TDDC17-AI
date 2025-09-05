@@ -4,8 +4,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
@@ -163,21 +165,44 @@ class MyAgentProgram implements AgentProgram {
 	public int iterationCounter = 100;
 	public MyAgentState state = new MyAgentState();
 
+	public record Triplet(int a, int b, int c) {};
+	public record Cord(int x, int y) {};
 
+	public Set<Cord> seen = new HashSet<>();
 
-	// Triplets of (X, Y, DIR)
-	public record Triplet(int x, int y, int dir) {}
-	// Represents seen states in the form (X, Y, DIR)
-	public Set<Triplet> seen = new HashSet<>();
+	// Maps cordinates to x, y, dir that was used to enter the key cordinate
+	public HashMap<Cord, Triplet> back_map = new HashMap<>();
 
-	// Represents next action 
-	public Deque<Action> Q = new ArrayDeque<>();
+	// X, Y, Dir. Keep track of taken actions. Use to backtrack.
+	public Stack<Triplet> action_stack = new Stack<>();
 
-	int x;
-	int y;
-	int dir;
-	Triplet current_state_triplet;
-	Triplet next_state;
+	// Used to quee actions for the agent
+	public Queue<Action> action_quee = new ArrayDeque<>();
+
+	int left(int dir) {return (dir - 1 + 4) % 4;};
+	int right(int dir) {return (dir + 1) % 4;};
+	int around(int dir) {return (dir + 2) % 4;};
+
+	Cord neighbor(int x, int y, int dir) {
+		return switch (dir) {
+			case 0 -> new Cord(x, y-1);
+			case 1 -> new Cord(x+1, y);
+			case 2 -> new Cord(x, y+1);
+			case 3 -> new Cord(x-1, y);
+			default -> throw new IllegalArgumentException("What?");
+		};
+	}
+
+	List<Action> actions_to_move_in_dir(int cur_dir, int target_dir) {
+		int dir_diff = (target_dir - cur_dir + 4) % 4;
+		return switch (dir_diff) {
+			case 0 -> new ArrayList<>();
+			case 1 -> List.of(LIUVacuumEnvironment.ACTION_TURN_RIGHT);
+			case 2 -> List.of(LIUVacuumEnvironment.ACTION_TURN_LEFT, LIUVacuumEnvironment.ACTION_TURN_LEFT);
+			case 3 -> List.of(LIUVacuumEnvironment.ACTION_TURN_LEFT);
+			default -> throw new IllegalAccessError();
+		};
+	}
 
 	// moves the Agent to a random start position
 	// uses percepts to update the Agent position - only the position, other percepts are ignored
@@ -214,8 +239,6 @@ class MyAgentProgram implements AgentProgram {
     		state.updatePosition((DynamicPercept) percept);
 			System.out.println("Processing percepts after the last execution of moveToRandomStartPosition()");
 			state.agent_last_action=state.ACTION_SUCK;
-
-			Q.addAll(Arrays.asList(LIUVacuumEnvironment.ACTION_MOVE_FORWARD, LIUVacuumEnvironment.ACTION_TURN_LEFT, LIUVacuumEnvironment.ACTION_TURN_RIGHT));
 
 	    	return LIUVacuumEnvironment.ACTION_SUCK;
     	}
@@ -277,47 +300,41 @@ class MyAgentProgram implements AgentProgram {
 	    	return LIUVacuumEnvironment.ACTION_SUCK;
 	    } 
 
-		x = state.agent_x_position;
-		y = state.agent_y_position;
-		dir = state.agent_direction;
+		// Initialization
+		seen.add(new Cord(state.agent_x_position, state.agent_y_position));
+		// back_map.put(new Cord(state.agent_x_position, state.agent_y_position), 0);
+		// action_stack.add(new Triplet(state.agent_x_position, state.agent_y_position, state.agent_direction));
 
-		current_state_triplet = new Triplet(x, y, dir);
-		System.out.println("Current state is:" + current_state_triplet); 
+		if (!action_quee.isEmpty()) return action_quee.poll();
 
-		seen.add(current_state_triplet);
-		System.out.println("Seen is" + seen);
-		System.out.println("Next actions are" + Q);
+		if (!action_stack.isEmpty()) {
+			Triplet t = action_stack.pop();
+			int x = t.a();
+			int y = t.a();
+			int dir = t.a();
+			boolean moved = false;
 
-		for (Action next_action : Arrays.asList(LIUVacuumEnvironment.ACTION_MOVE_FORWARD, LIUVacuumEnvironment.ACTION_TURN_LEFT, LIUVacuumEnvironment.ACTION_TURN_RIGHT))
-		{
+			for (int new_dir : new int[]{0, 1, 2, 3}) {
+				Cord neigh = neighbor(x, y, new_dir);
+				if (seen.contains(neigh)) continue;
+				if (state.world[neigh.x][neigh.y] == state.WALL) continue;
+				List<Action> move_steps = actions_to_move_in_dir(dir, new_dir);
+				move_steps.add(LIUVacuumEnvironment.ACTION_MOVE_FORWARD);
+				action_quee.addAll(move_steps);
+				back_map.put(neigh, new Triplet(x, y, new_dir));
+				seen.add(neigh);
+				action_stack.add(t)
+				moved = true;
+				break;
 
-			if (next_action == LIUVacuumEnvironment.ACTION_MOVE_FORWARD) {
-				Foo.cord next_pos = Foo.new_location_after_move(x, y, dir);
-				// If it is a FUCKING wall. WHY IS THIS SHIT NOT PUBLIC?!
-				if (state.world[next_pos.x()][next_pos.y()] == 1) continue;
-				next_state = new Triplet(next_pos.x(), next_pos.y(), dir);
-			} else if (next_action == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
-				int new_dir = Foo.new_direction_after_turn(dir, next_action);
-				next_state = new Triplet(x, y, new_dir);
-			} else if (next_action == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
-				int new_dir = Foo.new_direction_after_turn(dir, next_action);
-				next_state = new Triplet(x, y, new_dir);
 			}
 
-			if (!seen.contains(next_state)) {
-				Q.add(next_action);
+			if (!moved) {
+				// Backtrack
+				
 			}
-		}
 
-		if (!Q.isEmpty()) {
-			Action the_action = Q.pop();
-			int action_int_because_FUCK = Foo.action_to_int(the_action);
-			state.agent_last_action = action_int_because_FUCK;
-			return the_action;
 		}
-
-		state.agent_last_action = state.ACTION_NONE;
-		return NoOpAction.NO_OP;
 
 
 	}
