@@ -1,7 +1,9 @@
 package tddc17;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -16,6 +18,51 @@ import aima.core.agent.impl.DynamicPercept;
 import aima.core.agent.impl.NoOpAction;
 import aima.core.environment.liuvacuum.LIUVacuumEnvironment;
 import aima.core.environment.xyenv.Wall;
+
+class Foo 
+{
+	public static int new_direction_after_turn(int current_direction, Action left_or_right) {
+		List<Integer> arr = Arrays.asList(0, 1, 2, 3);
+		int indx = arr.indexOf(current_direction);
+
+		if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
+			return arr.get((indx + 1) % 4);
+
+		} else if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
+			return arr.get((indx - 1 + 4) % 4);
+		} else {
+			throw new IllegalArgumentException("Unsupported action dumbass!");
+		}
+	}
+
+
+	public record cord(int x, int y) {}
+	public static cord new_location_after_move(int x, int y, int direction) {
+		return switch (direction) {
+            case MyAgentState.NORTH -> new cord(x, y - 1);
+            case MyAgentState.EAST  -> new cord(x + 1, y);
+            case MyAgentState.SOUTH -> new cord(x, y + 1);
+            case MyAgentState.WEST  -> new cord(x - 1, y);
+            default -> throw new IllegalArgumentException("Invalid direction: " + direction);
+        };
+	}
+
+	public static int action_to_int(Action act) {
+		if (act == NoOpAction.NO_OP) {
+			return 0;
+		}
+		else if (act == LIUVacuumEnvironment.ACTION_MOVE_FORWARD) {
+			return 1;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
+			return 2;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
+			return 3;
+		} else if (act == LIUVacuumEnvironment.ACTION_SUCK) {
+			return 4;
+		}
+		throw new IllegalArgumentException("HOW?!");
+	}
+}
 
 class MyAgentState
 {
@@ -72,6 +119,9 @@ class MyAgentState
 				break;
 			}
 	    }
+
+		if (agent_last_action == ACTION_TURN_LEFT) agent_direction = Foo.new_direction_after_turn(agent_direction, LIUVacuumEnvironment.ACTION_TURN_LEFT);
+		if (agent_last_action == ACTION_TURN_RIGHT) agent_direction = Foo.new_direction_after_turn(agent_direction, LIUVacuumEnvironment.ACTION_TURN_RIGHT);
 		
 	}
 	
@@ -121,39 +171,13 @@ class MyAgentProgram implements AgentProgram {
 	public Set<Triplet> seen = new HashSet<>();
 
 	// Represents next action 
-	public Stack<Action> Q = new Stack<>();
+	public Deque<Action> Q = new ArrayDeque<>();
 
 	int x;
 	int y;
 	int dir;
 	Triplet current_state_triplet;
 	Triplet next_state;
-
-	public static int new_direction_after_turn(int current_direction, Action left_or_right) {
-		List<Integer> arr = Arrays.asList(0, 1, 2, 3);
-		int indx = arr.indexOf(current_direction);
-
-		if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
-			return arr.get((indx + 1) % 4);
-
-		} else if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
-			return arr.get((indx - 1) % 4);
-		} else {
-			throw new IllegalArgumentException("Unsupported action dumbass!");
-		}
-	}
-
-
-	public record cord(int x, int y) {}
-	public static cord new_location_after_move(int x, int y, int direction) {
-		return switch (direction) {
-            case MyAgentState.NORTH -> new cord(x, y - 1);
-            case MyAgentState.EAST  -> new cord(x + 1, y);
-            case MyAgentState.SOUTH -> new cord(x, y + 1);
-            case MyAgentState.WEST  -> new cord(x - 1, y);
-            default -> throw new IllegalArgumentException("Invalid direction: " + direction);
-        };
-	}
 
 	// moves the Agent to a random start position
 	// uses percepts to update the Agent position - only the position, other percepts are ignored
@@ -216,7 +240,7 @@ class MyAgentProgram implements AgentProgram {
 	    Boolean dirt = (Boolean)p.getAttribute("dirt");
 	    Boolean home = (Boolean)p.getAttribute("home");
 	    System.out.println("percept: " + p);
-	    
+
 	    // State update based on the percept value and the last action
 	    state.updatePosition((DynamicPercept)percept);
 	    if (bump) {
@@ -246,8 +270,6 @@ class MyAgentProgram implements AgentProgram {
 	    // Next action selection based on the percept value
 		// --- NOTE: Work from here ---
 		
-
-
 	    if (dirt)
 	    {
 	    	System.out.println("DIRT -> choosing SUCK action!");
@@ -255,37 +277,30 @@ class MyAgentProgram implements AgentProgram {
 	    	return LIUVacuumEnvironment.ACTION_SUCK;
 	    } 
 
-		if (bump)
-		{
-			state.agent_last_action=state.ACTION_NONE;
-			return LIUVacuumEnvironment.ACTION_TURN_LEFT;
-		}
-		
-
-		System.out.println("GOT HERE!");
 		x = state.agent_x_position;
 		y = state.agent_y_position;
 		dir = state.agent_direction;
 
 		current_state_triplet = new Triplet(x, y, dir);
+		System.out.println("Current state is:" + current_state_triplet); 
 
 		seen.add(current_state_triplet);
-		System.out.println(seen);
-
+		System.out.println("Seen is" + seen);
+		System.out.println("Next actions are" + Q);
 
 		for (Action next_action : Arrays.asList(LIUVacuumEnvironment.ACTION_MOVE_FORWARD, LIUVacuumEnvironment.ACTION_TURN_LEFT, LIUVacuumEnvironment.ACTION_TURN_RIGHT))
 		{
 
 			if (next_action == LIUVacuumEnvironment.ACTION_MOVE_FORWARD) {
-				cord next_pos = new_location_after_move(x, y, dir);
+				Foo.cord next_pos = Foo.new_location_after_move(x, y, dir);
 				// If it is a FUCKING wall. WHY IS THIS SHIT NOT PUBLIC?!
-				if (state.world[next_pos.x][next_pos.y] == 1) continue;
-				next_state = new Triplet(next_pos.x, next_pos.y, dir);
+				if (state.world[next_pos.x()][next_pos.y()] == 1) continue;
+				next_state = new Triplet(next_pos.x(), next_pos.y(), dir);
 			} else if (next_action == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
-				int new_dir = new_direction_after_turn(dir, next_action);
+				int new_dir = Foo.new_direction_after_turn(dir, next_action);
 				next_state = new Triplet(x, y, new_dir);
 			} else if (next_action == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
-				int new_dir = new_direction_after_turn(dir, next_action);
+				int new_dir = Foo.new_direction_after_turn(dir, next_action);
 				next_state = new Triplet(x, y, new_dir);
 			}
 
@@ -295,8 +310,13 @@ class MyAgentProgram implements AgentProgram {
 		}
 
 		if (!Q.isEmpty()) {
-			return Q.pop();
+			Action the_action = Q.pop();
+			int action_int_because_FUCK = Foo.action_to_int(the_action);
+			state.agent_last_action = action_int_because_FUCK;
+			return the_action;
 		}
+
+		state.agent_last_action = state.ACTION_NONE;
 		return NoOpAction.NO_OP;
 
 
