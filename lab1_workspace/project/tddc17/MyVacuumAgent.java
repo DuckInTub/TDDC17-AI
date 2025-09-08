@@ -19,6 +19,51 @@ import aima.core.agent.impl.DynamicPercept;
 import aima.core.agent.impl.NoOpAction;
 import aima.core.environment.liuvacuum.LIUVacuumEnvironment;
 
+class Foo 
+{
+	public static int new_direction_after_turn(int current_direction, Action left_or_right) {
+		List<Integer> arr = Arrays.asList(0, 1, 2, 3);
+		int indx = arr.indexOf(current_direction);
+
+		if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
+			return arr.get((indx + 1) % 4);
+
+		} else if (left_or_right == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
+			return arr.get((indx - 1 + 4) % 4);
+		} else {
+			throw new IllegalArgumentException("Unsupported action dumbass!");
+		}
+	}
+
+
+	public record cord(int x, int y) {}
+	public static cord new_location_after_move(int x, int y, int direction) {
+		return switch (direction) {
+            case MyAgentState.NORTH -> new cord(x, y - 1);
+            case MyAgentState.EAST  -> new cord(x + 1, y);
+            case MyAgentState.SOUTH -> new cord(x, y + 1);
+            case MyAgentState.WEST  -> new cord(x - 1, y);
+            default -> throw new IllegalArgumentException("Invalid direction: " + direction);
+        };
+	}
+
+	public static int action_to_int(Action act) {
+		if (act == NoOpAction.NO_OP) {
+			return 0;
+		}
+		else if (act == LIUVacuumEnvironment.ACTION_MOVE_FORWARD) {
+			return 1;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
+			return 2;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
+			return 3;
+		} else if (act == LIUVacuumEnvironment.ACTION_SUCK) {
+			return 4;
+		}
+		throw new IllegalArgumentException("HOW?!");
+	}
+}
+
 class MyAgentState
 {
 	public int[][] world = new int[30][30];
@@ -139,12 +184,16 @@ class MyAgentProgram implements AgentProgram {
 
 	// Maps cordinates to x, y, dir that was used to enter the key cordinate
 	public HashMap<Cord, Triplet> entered_through = new HashMap<>();
+	public HashMap<Cord, Triplet> entered_through = new HashMap<>();
 
 	// X, Y, Dir. Keep track of taken actions. Use to backtrack.
 	// X, Y cord and the dir that was moved in.
 	public Stack<Triplet> taken_actions = new Stack<>();
+	// X, Y cord and the dir that was moved in.
+	public Stack<Triplet> taken_actions = new Stack<>();
 
 	// Used to quee actions for the agent
+	public Queue<Action> actions_to_take = new ArrayDeque<>();
 	public Queue<Action> actions_to_take = new ArrayDeque<>();
 
 	// Cords on the path back home
@@ -176,6 +225,27 @@ class MyAgentProgram implements AgentProgram {
 			case 3 -> List.of(LIUVacuumEnvironment.ACTION_TURN_LEFT);
 			default -> throw new IllegalAccessError();
 		};
+	}
+
+	int liu_action_to_int_because_fucking_hell(Action act) {
+		// final int ACTION_NONE 			= 0;
+		// final int ACTION_MOVE_FORWARD 	= 1;
+		// final int ACTION_TURN_RIGHT 	= 2;
+		// final int ACTION_TURN_LEFT 		= 3;
+		// final int ACTION_SUCK	 		= 4;
+
+		if (act == NoOpAction.NO_OP) {
+			return 0;
+		} else if (act == LIUVacuumEnvironment.ACTION_MOVE_FORWARD) {
+			return 1;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_RIGHT) {
+			return 2;
+		} else if (act == LIUVacuumEnvironment.ACTION_TURN_LEFT) {
+			return 3;
+		} else if (act == LIUVacuumEnvironment.ACTION_SUCK) {
+			return 4;
+		}
+		throw new IllegalAccessError();
 	}
 
 	// moves the Agent to a random start position
@@ -250,12 +320,7 @@ class MyAgentProgram implements AgentProgram {
 				state.updateWorld(state.agent_x_position,state.agent_y_position,state.WALL);
 				break;
 			}
-			// Restores to previous x, y state
-			state.restorePreviousPosition();
-			taken_actions.pop();
-	    } 
-
-		if (dirt)
+	    } else if (dirt)
 	    	state.updateWorld(state.agent_x_position,state.agent_y_position,state.DIRT);
 	    else
 	    	state.updateWorld(state.agent_x_position,state.agent_y_position,state.CLEAR);
@@ -264,6 +329,7 @@ class MyAgentProgram implements AgentProgram {
 		System.out.println("Backtrack stack is " + taken_actions);
 		System.out.println("Action to take are" + actions_to_take);
 		System.out.println("Seen is" + seen);
+	    
 	    
 	    // Next action selection based on the percept value
 		// --- NOTE: Work from here ---
@@ -277,43 +343,24 @@ class MyAgentProgram implements AgentProgram {
 		// Initialization
 		seen.add(new Cord(state.agent_x_position, state.agent_y_position));
 
-		if (!actions_to_take.isEmpty()) 
-			return state.updatePosition(actions_to_take.poll());
+		if (!actions_to_take.isEmpty()) {
+			Action act = actions_to_take.poll();
+			state.agent_last_action = liu_action_to_int_because_fucking_hell(act);
+			return act;
+		}
+
 
 		int x = state.agent_x_position;
 		int y = state.agent_y_position;
 		int dir = state.agent_direction;
 		boolean moved = false;
 
-		if (ready_to_go_home) {
-			if (x == 1 && y == 1) {
-				return NoOpAction.NO_OP;
-			}
-
-			moved = false;
-			Cord neigh = back_to_home_path.pop();
-			int dx = neigh.x - x;
-			int dy = neigh.y - y;
-			assert Math.abs(dx) <= 1;
-			assert Math.abs(dy) <= 1;
-			int new_dir = 0;
-
-			if (dx == 1) new_dir = MyAgentState.EAST;
-			if (dx == -1) new_dir = MyAgentState.WEST;
-			if (dy == -1) new_dir = MyAgentState.NORTH;
-			if (dy == 1) new_dir = MyAgentState.SOUTH;
-
-			actions_to_take.addAll(actions_to_move_in_dir(dir, new_dir));
-			actions_to_take.add(LIUVacuumEnvironment.ACTION_MOVE_FORWARD);
-
-			return state.updatePosition(actions_to_take.poll());
-		}
-
 		for (int dir_dx : new int[]{-1, 0, 1, 2}) {
 			int new_dir = (dir + dir_dx + 4) % 4;
 			Cord neigh = neighbor(x, y, new_dir);
 			if (seen.contains(neigh)) continue;
-			if (state.getWorldAt(neigh.y, neigh.x) == state.WALL || state.getWorldAt(neigh.y, neigh.x) == state.CLEAR) {
+			if (state.world[neigh.x()][neigh.y()] != state.UNKNOWN) {
+				System.out.println("It is not unknwon! it was" + state.world[neigh.x][neigh.y]);
 				continue;
 			}
 			actions_to_take.addAll(actions_to_move_in_dir(dir, new_dir));
@@ -323,38 +370,20 @@ class MyAgentProgram implements AgentProgram {
 			taken_actions.add(new Triplet(x, y, new_dir));
 			break;
 		}
-		
-		// Backtrack
+
 		if (!moved) {
 			System.out.println("Starting backtrack");
-
-			if (taken_actions.empty()) {
-				
-				List<Cord> arround_me = List.of(new Cord(x + 1, y + 0),
-				new Cord(x - 1, y + 0), new Cord(x + 0, y + 1), new Cord(x + 0, y - 1));
-
-				Cord the_cord = new Cord(1, 1);
-				back_to_home_path.add(the_cord);
-				while (!arround_me.contains(the_cord)) {
-					Triplet trip = entered_through.get(the_cord);
-					the_cord = new Cord(trip.a(), trip.b());
-					back_to_home_path.add(the_cord);
-				}
-
-				ready_to_go_home = true;
-				moved = true;
-				System.out.println("AAAAAAAAAAAAAa");
-				return state.updatePosition(LIUVacuumEnvironment.ACTION_SUCK);
-			}
-
+			// Backtrack
 			Triplet last_action = taken_actions.pop();
 			int back_dir = around(last_action.c());
-			// entered_through.put(new Cord(last_action.a(), last_action.b()), new Triplet(x, y, back_dir));
-			// actions_to_take.addAll(actions_to_move_in_dir(dir, back_dir));
+			actions_to_take.addAll(actions_to_move_in_dir(dir, back_dir));
 			actions_to_take.add(LIUVacuumEnvironment.ACTION_MOVE_FORWARD);
 		}
 
-		return state.updatePosition(actions_to_take.poll());
+		Action act = actions_to_take.poll();
+		state.agent_last_action = liu_action_to_int_because_fucking_hell(act);
+		return act;
+
 	}
 }
 
