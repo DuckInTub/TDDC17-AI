@@ -1,0 +1,13 @@
+Loop:
+Check all neighboring cells for unknown cells.
+Move to unknown cells with bias order: left, forward, right.
+In the case that there are no unknowns: backtrack until there is an unknown neighbor.
+Keep checking unknown neighbors in the same bias pattern again.
+
+This is a DFS with backtracking. Backtracking because the agent can not teleport.
+
+
+NOTE: Currently backtracking uses a simple stack of move directions. 
+Also, we have no real way of getting home at the end.
+
+Revisit the idea of the HashMap. This can give us breadcrumbs to get back home.
