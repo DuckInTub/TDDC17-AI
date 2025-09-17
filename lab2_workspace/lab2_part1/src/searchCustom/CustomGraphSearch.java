@@ -1,5 +1,6 @@
 package searchCustom;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashSet;
 
@@ -37,11 +38,39 @@ public class CustomGraphSearch implements SearchObject {
 		// Initialize the frontier with the start state  
 		frontier.addNodeToFront(new SearchNode(startState));
 
+		int branching_counter_sum = 0;
+
 		// Path will be empty until we find the goal.
 		path = new ArrayList<SearchNode>();
 		
-		// Implement this!
-		System.out.println("Implement CustomGraphSearch.java!");
+		while (!frontier.isEmpty()) {
+			SearchNode at = frontier.removeFirst();
+
+			if (p.isGoalState(at.getState())) { // If we are on the goal
+				System.out.println("We found goal at: " + at.getState());
+				assert path.addAll(at.getPathFromRoot());
+				path.add(at);
+				double average_branching_factor = (double) branching_counter_sum / explored.size();
+				System.out.println("The average branching factor was: " + average_branching_factor);
+				return path;
+			}
+
+			if (explored.contains(at)) continue;
+
+			explored.add(at);
+
+			ArrayList<GridPos> neighbors = p.getReachableStatesFrom(at.getState());
+			branching_counter_sum += neighbors.size();
+
+			for (GridPos neigh : neighbors) {
+				SearchNode neighbor_node = new SearchNode(neigh);
+				if (!explored.contains(neighbor_node)) {
+					frontier.addNodeToBack(neighbor_node);
+				}
+			}
+
+		}
+		return path;
 		
 		
 		/* Some hints:
@@ -68,7 +97,6 @@ public class CustomGraphSearch implements SearchObject {
 		 *  When the goal is found, the path to be returned can be found by: path = node.getPathFromRoot();
 		 */
 		/* Note: Returning an empty path signals that no path exists */
-		return path;
 	}
 
 	/*
