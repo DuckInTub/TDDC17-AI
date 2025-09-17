@@ -36,7 +36,9 @@ public class CustomGraphSearch implements SearchObject {
 		// The start state is given
 		GridPos startState = (GridPos) p.getInitialState();
 		// Initialize the frontier with the start state  
-		frontier.addNodeToFront(new SearchNode(startState));
+		SearchNode startNode = new SearchNode(startState);
+		frontier.addNodeToFront(startNode);
+		SearchNode prevNode = startNode;
 
 		int branching_counter_sum = 0;
 
@@ -47,9 +49,12 @@ public class CustomGraphSearch implements SearchObject {
 			SearchNode at = frontier.removeFirst();
 
 			if (p.isGoalState(at.getState())) { // If we are on the goal
+				path = new ArrayList<>(at.getPathFromRoot());
+
 				System.out.println("We found goal at: " + at.getState());
-				assert path.addAll(at.getPathFromRoot());
-				path.add(at);
+				System.out.println("With path: " + path);
+				System.out.println("Parent node: " + at.getParent());
+
 				double average_branching_factor = (double) branching_counter_sum / explored.size();
 				System.out.println("The average branching factor was: " + average_branching_factor);
 				return path;
@@ -60,10 +65,13 @@ public class CustomGraphSearch implements SearchObject {
 			explored.add(at);
 
 			ArrayList<GridPos> neighbors = p.getReachableStatesFrom(at.getState());
+			neighbors.removeAll(explored);
+			neighbors.remove(at);
 			branching_counter_sum += neighbors.size();
 
 			for (GridPos neigh : neighbors) {
-				SearchNode neighbor_node = new SearchNode(neigh);
+				// NOTE: Remember to set parent node by refrencing `at`
+				SearchNode neighbor_node = new SearchNode(neigh, at); 
 				if (!explored.contains(neighbor_node)) {
 					frontier.addNodeToBack(neighbor_node);
 				}
@@ -71,7 +79,6 @@ public class CustomGraphSearch implements SearchObject {
 
 		}
 		return path;
-		
 		
 		/* Some hints:
 		 * -Read early part of chapter 3 in the book!
