@@ -2,6 +2,7 @@ package searchCustom;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 
 import searchShared.NodeQueue;
@@ -71,9 +72,14 @@ public class CustomGraphSearch implements SearchObject {
 
 			for (GridPos neigh : neighbors) {
 				// NOTE: Remember to set parent node by refrencing `at`
+				// NOTE: Remember to look at bool insertFront
 				SearchNode neighbor_node = new SearchNode(neigh, at); 
 				if (!explored.contains(neighbor_node)) {
-					frontier.addNodeToBack(neighbor_node);
+					if (insertFront) {
+						frontier.addNodeToFront(neighbor_node);
+					} else {
+						frontier.addNodeToBack(neighbor_node);
+					}
 				}
 			}
 
