@@ -66,8 +66,6 @@ public class CustomGraphSearch implements SearchObject {
 			explored.add(at);
 
 			ArrayList<GridPos> neighbors = p.getReachableStatesFrom(at.getState());
-			neighbors.removeAll(explored);
-			neighbors.remove(at);
 			branching_counter_sum += neighbors.size();
 
 			for (GridPos neigh : neighbors) {
