@@ -148,6 +148,8 @@ class MyAgentProgram implements AgentProgram {
 	public static int right(int dir) {return (dir + 1) % 4;};
 	public static int around(int dir) {return (dir + 2) % 4;};
 
+	public boolean goHome = false;
+
 	ArrayList<Cord> BFS(int[][] world, int x, int y, int gx, int gy) {
 
 		Deque<Cord> frontier = new ArrayDeque<>();
@@ -155,17 +157,20 @@ class MyAgentProgram implements AgentProgram {
 		Set<Cord> explored = new HashSet<>();
 
 		Cord at = new Cord(x, y);
+		Cord goal = new Cord(gx, gy);
 
 		HashMap<Cord, Cord> parentMap = new HashMap<>();
+
+		frontier.add(at);
+		parentMap.put(at, null);
 
 		while (!frontier.isEmpty()) {
 			at = frontier.pollFirst();
 
 			if (explored.contains(at)) continue;
 
-			if (at.x() == gx && at.y() == gy) {
-
-
+			if (at.equals(goal)) {
+				break;
 			}
 
 			explored.add(at);
@@ -174,14 +179,75 @@ class MyAgentProgram implements AgentProgram {
 				for (int dy = -1; dy <= 1; dy++) {
 					if (Math.abs(dx) == Math.abs(dy)) continue;
 					Cord node = new Cord(at.x()+dx, at.y()+dy);
-					parentMap.put(at, node);
-					frontier.addLast(node);
+					// Check if the node is within bounds and not an obstacle
+					if (node.x() >= 0 && node.x() < world.length && 
+						node.y() >= 0 && node.y() < world[0].length && 
+						world[node.x()][node.y()] == 2 && // If (x, y) is clear
+						!explored.contains(node) && 
+						!frontier.contains(node)) {
+						
+						parentMap.put(node, at); // Set parent
+						frontier.addLast(node); // Add to frontier
+					}
 				}
 			}
 		}
 
-		return new ArrayList<>();
+		ArrayList<Cord> path = new ArrayList<>();
+
+		at = new Cord(gx, gy);
+
+		while (at != null) {
+			path.add(at);
+			at = parentMap.get(at);
+		}
+		return new ArrayList<>(path.reversed());
 	}
+
+
+
+	ArrayList<Action> walk_path(ArrayList<Cord> path, int x, int y, int dir) {
+		ArrayList<Action> actions = new ArrayList<>();
+		
+		for (Cord node : path) {
+			// Calculate the difference in coordinates
+			int dx = node.x() - x;
+			int dy = node.y() - y;
+
+			// Determine the new direction based on dx and dy
+			int new_dir;
+			if (dx == 0 && dy == 1) {
+				new_dir = 0; // NORTH
+			} else if (dx == 1 && dy == 0) {
+				new_dir = 1; // EAST
+			} else if (dx == 0 && dy == -1) {
+				new_dir = 2; // SOUTH
+			} else if (dx == -1 && dy == 0) {
+				new_dir = 3; // WEST
+			} else {
+				continue; // Invalid move
+			}
+
+			// Calculate the number of turns needed to face the new direction
+			int turns = (new_dir - dir + 4) % 4;
+			for (int i = 0; i < turns; i++) {
+				actions.add(LIUVacuumEnvironment.ACTION_TURN_RIGHT); // Assuming turning right
+			}
+
+			// Move forward to the next node
+			actions.add(LIUVacuumEnvironment.ACTION_MOVE_FORWARD);
+			
+			// Update the current position and direction
+			x = node.x();
+			y = node.y();
+			dir = new_dir; // Update the current direction
+		}
+
+		System.out.println("We got actions: " + actions);
+		return actions;
+	}
+
+
 
 	Cord neighbor(int x, int y, int dir) {
 		// North, East, South, West.
@@ -330,7 +396,6 @@ class MyAgentProgram implements AgentProgram {
 		if (!moved && !taken_actions.isEmpty()) {
 			System.out.println("Starting backtrack");
 
-
 			Triplet last_action = taken_actions.pop();
 			int back_dir = around(last_action.c());
 			actions_to_take.addAll(actions_to_move_in_dir(dir, back_dir));
@@ -338,6 +403,14 @@ class MyAgentProgram implements AgentProgram {
 		}
 
 		if (!moved && taken_actions.isEmpty()) {
+			return NoOpAction.NO_OP;
+			// goHome = true;
+			// ArrayList<Cord> home_path = BFS(state.world, x, y, 1, 1);
+			// System.out.println("We calculated home path: " + home_path);
+			// actions_to_take.addAll(walk_path(home_path, x, y, dir));
+		}
+
+		if (goHome && x == 1 && y == 1) {
 			return NoOpAction.NO_OP;
 		}
 
