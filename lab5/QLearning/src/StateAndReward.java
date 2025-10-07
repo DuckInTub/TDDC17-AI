@@ -6,8 +6,7 @@ public class StateAndReward {
 
 		/* TODO: IMPLEMENT THIS FUNCTION */
 
-		String state = "OneStateToRuleThemAll";
-		
+		String state = String.format("%.2f%.2f%.2f", angle, vx, vy);
 		return state;
 	}
 
@@ -16,7 +15,7 @@ public class StateAndReward {
 
 		/* TODO: IMPLEMENT THIS FUNCTION */
 		
-		double reward = 0;
+		double reward = Math.sin(angle+Math.PI/2);
 
 		return reward;
 	}
